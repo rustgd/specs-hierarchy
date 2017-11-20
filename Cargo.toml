@@ -1,0 +1,12 @@
+[package]
+name = "specs_hierarchy"
+version = "0.1.0"
+authors = ["Aceeri <conmcclusk@gmail.com>"]
+
+[dependencies]
+#specs = { path = "../specs", version = "0.11" }
+#specs-derive = { path = "../specs/specs-derive/", version = "0.2" }
+specs = "0.10"
+specs-derive = "0.1"
+shred = "0.5"
+shred-derive = "0.3"
