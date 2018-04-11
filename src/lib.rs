@@ -8,7 +8,9 @@ extern crate specs;
 use std::marker::PhantomData;
 use std::collections::{HashMap, HashSet};
 
-use specs::prelude::*;
+use specs::prelude::{BitSet, Component, Entities, Entity, InsertedFlag, Join, ModifiedFlag,
+                     ReadStorage, ReaderId, RemovedFlag, System, SystemData, Tracked, Write,
+                     WriteStorage};
 use specs::world::Index;
 use hibitset::BitSetLike;
 use shrev::EventChannel;
@@ -202,19 +204,32 @@ impl<P> Hierarchy<P> {
             }
 
             // insert in new parents children
-            let children = self.children
+            self.children
                 .entry(parent_entity)
-                .or_insert_with(Vec::default);
-            children.push(entity);
+                .or_insert_with(Vec::default)
+                .push(entity);
 
             // move entity in sorted if needed
             let entity_index = self.entities.get(&entity.id()).cloned().unwrap();
             if let Some(parent_index) = self.entities.get(&parent_entity.id()).cloned() {
+                let mut offset = 0;
+                let mut process_index = parent_index;
+                while process_index > entity_index {
+                    let move_entity = self.sorted.remove(process_index);
+                    self.sorted.insert(entity_index, move_entity);
+                    offset += 1;
+                    process_index = self.current_parent
+                        .get(&move_entity)
+                        .and_then(|p_entity| self.entities.get(&p_entity.id()))
+                        .map(|p_index| p_index + offset)
+                        .unwrap_or(0);
+                }
+
+                // fix indexes
                 if parent_index > entity_index {
-                    self.sorted.swap(entity_index, parent_index);
-                    // if entity is moved, redo indexing
-                    self.entities.insert(entity.id(), parent_index);
-                    self.entities.insert(parent_entity.id(), entity_index);
+                    for i in entity_index..parent_index {
+                        self.entities.insert(self.sorted[i].id(), i);
+                    }
                 }
             }
 
@@ -269,9 +284,9 @@ where
 
 #[derive(SystemData)]
 pub struct ParentData<'a, P>
-    where
-        P: Component + Parent,
-        P::Storage: Tracked,
+where
+    P: Component + Parent,
+    P::Storage: Tracked,
 {
     entities: Entities<'a>,
     parents: ReadStorage<'a, P>,
@@ -292,7 +307,10 @@ where
     P: Component + Parent + Send + Sync + 'static,
     P::Storage: Tracked,
 {
-    type SystemData = (ParentData<'a, P>, Write<'a, Hierarchy<P>, HierarchySetupHandler<P>>);
+    type SystemData = (
+        ParentData<'a, P>,
+        Write<'a, Hierarchy<P>, HierarchySetupHandler<P>>,
+    );
 
     fn run(&mut self, (data, mut hierarchy): Self::SystemData) {
         hierarchy.maintain(data);
