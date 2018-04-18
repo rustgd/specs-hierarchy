@@ -1,3 +1,14 @@
+/// Scene graph type hierarchy for use with specs.
+///
+/// Will use the given generic type `P` as the component type that provides parenting links. The
+/// internal structure is kept in sync with the `Tracked` events for that component type.
+///
+/// Will send modification events on the internal `EventChannel`. Note that `Removed` events
+/// does not mean the `Parent` component was removed from the component storage, just that the
+/// `Entity` will no longer be considered to be a part of the `Hierarchy`. This is because the user
+/// may wish to either remove only the component, or the complete Entity, or something completely
+/// different. When an `Entity` that is a parent gets removed from the hierarchy, the full tree of
+/// children below it will also be removed from the hierarchy.
 extern crate hibitset;
 extern crate shred;
 #[macro_use]
@@ -16,11 +27,30 @@ use hibitset::BitSetLike;
 use shrev::EventChannel;
 use shred::{Resources, SetupHandler};
 
+/// Hierarchy events.
+///
+/// These are the events that are sent through the internal `EventChannel` in the `Hierarchy`
+/// resource.
 pub enum HierarchyEvent {
+    /// `Entity` was either inserted or modified in the `Hierarchy`
     Modified(Entity),
+    /// `Entity` was removed from the `Hierarchy`. Note that this does not mean the `Parent`
+    /// component was removed from the component storage, just that the `Entity` will no longer be
+    /// considered to be a part of the `Hierarchy`.
     Removed(Entity),
 }
 
+/// Scene graph type hierarchy.
+///
+/// Will use the given generic type `P` as the component type that provides parenting links. The
+/// internal structure is kept in sync with the `Tracked` events for that component type.
+///
+/// Will send modification events on the internal `EventChannel`. Note that `Removed` events
+/// does not mean the `Parent` component was removed from the component storage, just that the
+/// `Entity` will no longer be considered to be a part of the `Hierarchy`. This is because the user
+/// may wish to either remove only the component, or the complete Entity, or something completely
+/// different. When an `Entity` that is a parent gets removed from the hierarchy, the full tree of
+/// children below it will also be removed from the hierarchy.
 pub struct Hierarchy<P> {
     sorted: Vec<Entity>,
     entities: HashMap<Index, usize>,
@@ -73,18 +103,35 @@ impl<P> Hierarchy<P> {
         }
     }
 
-    /// Returns all sorted entities that contain parents.
+    /// Get all entities that contain parents, in sorted order, where parents are guaranteed to
+    /// be before their children.
     ///
     /// Note: This does not include entities that **are** parents.
     pub fn all(&self) -> &[Entity] {
         self.sorted.as_slice()
     }
 
-    /// Gets the children of a specific entity.
+    /// Get the children of a specific entity.
     pub fn children(&self, entity: Entity) -> Option<&[Entity]> {
         self.children.get(&entity).map(|vec| vec.as_slice())
     }
 
+    /// Get the parent of a specific entity
+    pub fn parent(&self, entity: Entity) -> Option<Entity> {
+        self.current_parent.get(&entity).cloned()
+    }
+
+    /// Get a token for tracking the modification events from the hierarchy
+    pub fn track(&mut self) -> ReaderId<HierarchyEvent> {
+        self.changed.register_reader()
+    }
+
+    /// Get the `EventChannel` for the modification events for reading
+    pub fn changed(&self) -> &EventChannel<HierarchyEvent> {
+        &self.changed
+    }
+
+    /// Maintain the hierarchy, usually only called by `HierarchySystem`.
     pub fn maintain(&mut self, data: ParentData<P>)
     where
         P: Component + Parent,
@@ -254,10 +301,13 @@ impl<P> Hierarchy<P> {
     }
 }
 
+/// Implemented by the component type that provides parenting links for a hierarchy.
 pub trait Parent {
+    /// Get the parent entity
     fn parent_entity(&self) -> Entity;
 }
 
+/// Specs `SetupHandler` for the `Hierarchy` resource.
 pub struct HierarchySetupHandler<P> {
     _m: PhantomData<P>,
 }
@@ -282,6 +332,7 @@ where
     }
 }
 
+/// Utility struct for the data needed by the `Hierarchy` maintain.
 #[derive(SystemData)]
 pub struct ParentData<'a, P>
 where
@@ -292,6 +343,11 @@ where
     parents: ReadStorage<'a, P>,
 }
 
+/// System for maintaining a `Hierarchy` resource.
+///
+/// ### Type parameters:
+///
+/// - `P`: Component type that provides `Parent` links for the maintained `Hierarchy`
 pub struct HierarchySystem<P> {
     m: PhantomData<P>,
 }
