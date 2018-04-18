@@ -1,8 +1,7 @@
-
 extern crate specs;
 extern crate specs_hierarchy;
 
-use specs::*;
+use specs::prelude::*;
 use specs_hierarchy::{Hierarchy, HierarchySystem};
 
 struct Parent {
@@ -22,18 +21,19 @@ impl specs_hierarchy::Parent for Parent {
 fn main() {
     let mut world = World::new();
     world.register::<Parent>();
-    world.add_resource::<Hierarchy<Parent, DenseVecStorage<Parent>>>(Hierarchy::new());
+    let mut system = HierarchySystem::<Parent>::new();
+    system.setup(&mut world.res);
 
-    let e0 = world.create_entity().build();
+    let _e0 = world.create_entity().build();
     let e1 = world.create_entity().build();
     let e2 = world.create_entity().build();
     let e3 = world.create_entity().build();
     let e4 = world.create_entity().build();
     let e5 = world.create_entity().build();
-    let e6 = world.create_entity().build();
-    let e7 = world.create_entity().build();
-    let e8 = world.create_entity().build();
-    let e9 = world.create_entity().build();
+    let _e6 = world.create_entity().build();
+    let _e7 = world.create_entity().build();
+    let _e8 = world.create_entity().build();
+    let _e9 = world.create_entity().build();
 
     {
         let mut parents = world.write::<Parent>();
@@ -44,19 +44,19 @@ fn main() {
     }
 
     let mut dispatcher = DispatcherBuilder::new()
-        .add(HierarchySystem::<Parent, DenseVecStorage<Parent>>::new(), "hierarchy_system", &[])
+        .with(system, "hierarchy_system", &[])
         .build();
 
     dispatcher.dispatch(&mut world.res);
 
     {
         let parents = world.read::<Parent>();
-        for entity in world.read_resource::<Hierarchy<Parent, DenseVecStorage<Parent>>>().all() {
-            let formatted = match parents.get(*entity) {
-                Some(parent) => format!("({}, {})", parent.entity.id(), parent.entity.gen().id()),
-                None => format!("None"),
-            };
-            println!("({}, {}): {}", entity.id(), entity.gen().id(), formatted);
+        for entity in world.read_resource::<Hierarchy<Parent>>().all() {
+            let formatted = parents
+                .get(*entity)
+                .map(|parent| format!("{:?}", parent.entity))
+                .unwrap_or(format!("None"));
+            println!("{:?}: {}", entity, formatted);
         }
     }
 }
