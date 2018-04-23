@@ -56,6 +56,7 @@ pub struct Hierarchy<P> {
     entities: HashMap<Index, usize>,
     children: HashMap<Entity, Vec<Entity>>,
     current_parent: HashMap<Entity, Entity>,
+    external_parents: HashSet<Entity>,
     changed: EventChannel<HierarchyEvent>,
 
     modified_id: ReaderId<ModifiedFlag>,
@@ -86,6 +87,7 @@ impl<P> Hierarchy<P> {
             sorted: Vec::new(),
             entities: HashMap::new(),
             current_parent: HashMap::new(),
+            external_parents: HashSet::new(),
             children: HashMap::new(),
             changed: EventChannel::new(),
 
@@ -157,6 +159,12 @@ impl<P> Hierarchy<P> {
                 self.scratch_set.insert(self.sorted[*index]);
             }
         }
+        // handle parents that have been removed which do not have a Parent themselves
+        for entity in &self.external_parents {
+            if !entities.is_alive(*entity) {
+                self.scratch_set.insert(*entity);
+            }
+        }
 
         // do removal
         if !self.scratch_set.is_empty() {
@@ -196,6 +204,7 @@ impl<P> Hierarchy<P> {
             }
             for entity in &self.scratch_set {
                 self.changed.single_write(HierarchyEvent::Removed(*entity));
+                self.external_parents.remove(entity);
             }
         }
 
@@ -225,13 +234,19 @@ impl<P> Hierarchy<P> {
                 }
             }
 
-            let children = self.children
-                .entry(parent_entity)
-                .or_insert_with(Vec::default);
-            children.push(entity);
+            {
+                let children = self.children
+                    .entry(parent_entity)
+                    .or_insert_with(Vec::default);
+                children.push(entity);
+            }
 
             self.current_parent.insert(entity, parent_entity);
             self.scratch_set.insert(entity);
+            if !self.current_parent.contains_key(&parent_entity) {
+                self.external_parents.insert(parent_entity);
+            }
+            self.external_parents.remove(&entity);
         }
 
         for (entity, _, parent) in (&*entities, &self.modified.clone(), &parents).join() {
@@ -282,6 +297,10 @@ impl<P> Hierarchy<P> {
 
             self.current_parent.insert(entity, parent_entity);
             self.scratch_set.insert(entity);
+
+            if !self.current_parent.contains_key(&parent_entity) {
+                self.external_parents.insert(parent_entity);
+            }
         }
 
         if !self.scratch_set.is_empty() {
@@ -297,6 +316,16 @@ impl<P> Hierarchy<P> {
                     self.changed.single_write(HierarchyEvent::Modified(entity));
                 }
             }
+        }
+
+        self.scratch_set.clear();
+        for entity in &self.external_parents {
+            if !self.children.contains_key(entity) {
+                self.scratch_set.insert(*entity);
+            }
+        }
+        for entity in &self.scratch_set {
+            self.external_parents.remove(entity);
         }
     }
 }
@@ -370,5 +399,87 @@ where
 
     fn run(&mut self, (data, mut hierarchy): Self::SystemData) {
         hierarchy.maintain(data);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::{Hierarchy, HierarchyEvent, HierarchySystem, Parent as PParent};
+    use specs::prelude::{Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId, RunNow,
+                         System, World};
+
+    struct Parent {
+        entity: Entity,
+    }
+
+    impl Component for Parent {
+        type Storage = FlaggedStorage<Self, DenseVecStorage<Self>>;
+    }
+
+    impl PParent for Parent {
+        fn parent_entity(&self) -> Entity {
+            self.entity
+        }
+    }
+
+    fn delete_removals(world: &mut World, reader_id: &mut ReaderId<HierarchyEvent>) {
+        let mut remove = vec![];
+        for event in world
+            .read_resource::<Hierarchy<Parent>>()
+            .changed()
+            .read(reader_id)
+        {
+            if let HierarchyEvent::Removed(entity) = *event {
+                remove.push(entity);
+            }
+        }
+        for entity in remove {
+            if let Err(_) = world.delete_entity(entity) {
+                println!("Failed removed entity");
+            }
+        }
+    }
+
+    #[test]
+    fn parent_removed() {
+        let mut world = World::new();
+        world.register::<Parent>();
+        <HierarchySystem<Parent> as System>::setup(&mut world.res);
+        let mut system = HierarchySystem::<Parent>::new();
+        let mut reader_id = world.write_resource::<Hierarchy<Parent>>().track();
+
+        let e1 = world.create_entity().build();
+
+        let e2 = world.create_entity().with(Parent { entity: e1 }).build();
+
+        let e3 = world.create_entity().build();
+
+        let e4 = world.create_entity().with(Parent { entity: e3 }).build();
+
+        let e5 = world.create_entity().with(Parent { entity: e4 }).build();
+
+        system.run_now(&mut world.res);
+        delete_removals(&mut world, &mut reader_id);
+        world.maintain();
+
+        let _ = world.delete_entity(e1);
+        system.run_now(&mut world.res);
+        delete_removals(&mut world, &mut reader_id);
+        world.maintain();
+
+        assert_eq!(world.is_alive(e1), false);
+        assert_eq!(world.is_alive(e2), false);
+
+        let _ = world.delete_entity(e3);
+        system.run_now(&mut world.res);
+        delete_removals(&mut world, &mut reader_id);
+        world.maintain();
+
+        assert_eq!(world.is_alive(e3), false);
+        assert_eq!(world.is_alive(e4), false);
+        assert_eq!(world.is_alive(e5), false);
+
+        assert_eq!(0, world.read_resource::<Hierarchy<Parent>>().all().len());
     }
 }
