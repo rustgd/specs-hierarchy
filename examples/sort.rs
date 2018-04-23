@@ -20,9 +20,10 @@ impl specs_hierarchy::Parent for Parent {
 
 fn main() {
     let mut world = World::new();
-    world.register::<Parent>();
-    let mut system = HierarchySystem::<Parent>::new();
-    system.setup(&mut world.res);
+    let mut dispatcher = DispatcherBuilder::new()
+        .with(HierarchySystem::<Parent>::new(), "hierarchy_system", &[])
+        .build();
+    dispatcher.setup(&mut world.res);
 
     let _e0 = world.create_entity().build();
     let e1 = world.create_entity().build();
@@ -42,10 +43,6 @@ fn main() {
         parents.insert(e4, Parent { entity: e5 });
         parents.insert(e5, Parent { entity: e2 });
     }
-
-    let mut dispatcher = DispatcherBuilder::new()
-        .with(system, "hierarchy_system", &[])
-        .build();
 
     dispatcher.dispatch(&mut world.res);
 
