@@ -51,6 +51,8 @@ pub enum HierarchyEvent {
 /// may wish to either remove only the component, or the complete Entity, or something completely
 /// different. When an `Entity` that is a parent gets removed from the hierarchy, the full tree of
 /// children below it will also be removed from the hierarchy.
+///
+/// Any cycles in the hierarchy will cause Undefined Behavior.
 pub struct Hierarchy<P> {
     sorted: Vec<Entity>,
     entities: HashMap<Index, usize>,
@@ -212,6 +214,7 @@ impl<P> Hierarchy<P> {
         self.scratch_set.clear();
         for (entity, _, parent) in (&*entities, &self.inserted, &parents).join() {
             let parent_entity = parent.parent_entity();
+
             // if we insert a parent component on an entity that have children, we need to make
             // sure the parent is inserted before the children in the sorted list
             let insert_index = self.children
@@ -445,8 +448,8 @@ mod tests {
     fn parent_removed() {
         let mut world = World::new();
         world.register::<Parent>();
-        <HierarchySystem<Parent> as System>::setup(&mut world.res);
         let mut system = HierarchySystem::<Parent>::new();
+        System::setup(&mut system, &mut world.res);
         let mut reader_id = world.write_resource::<Hierarchy<Parent>>().track();
 
         let e1 = world.create_entity().build();
