@@ -20,12 +20,12 @@ use std::marker::PhantomData;
 use std::collections::{HashMap, HashSet};
 
 use specs::prelude::{BitSet, Component, Entities, Entity, InsertedFlag, Join, ModifiedFlag,
-                     ReadStorage, ReaderId, RemovedFlag, System, SystemData, Tracked, Write,
-                     WriteStorage};
+                     ReadStorage, ReaderId, RemovedFlag, Resources, System, SystemData, Tracked,
+                     Write, WriteStorage};
 use specs::world::Index;
 use hibitset::BitSetLike;
 use shrev::EventChannel;
-use shred::{Resources, SetupHandler};
+use shred::SetupHandler;
 
 /// Hierarchy events.
 ///

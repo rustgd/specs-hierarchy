@@ -37,7 +37,7 @@ fn main() {
     let _e9 = world.create_entity().build();
 
     {
-        let mut parents = world.write::<Parent>();
+        let mut parents = world.write_storage::<Parent>();
         parents.insert(e1, Parent { entity: e5 });
         parents.insert(e3, Parent { entity: e1 });
         parents.insert(e4, Parent { entity: e5 });
@@ -47,7 +47,7 @@ fn main() {
     dispatcher.dispatch(&mut world.res);
 
     {
-        let parents = world.read::<Parent>();
+        let parents = world.read_storage::<Parent>();
         for entity in world.read_resource::<Hierarchy<Parent>>().all() {
             let formatted = parents
                 .get(*entity)
