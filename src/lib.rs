@@ -1,14 +1,42 @@
-/// Scene graph type hierarchy for use with specs.
+/// # `specs-hierarchy`
 ///
-/// Will use the given generic type `P` as the component type that provides parenting links. The
-/// internal structure is kept in sync with the `Tracked` events for that component type.
+/// Scene graph type hierarchy for use with Specs.
 ///
-/// Will send modification events on the internal `EventChannel`. Note that `Removed` events
-/// does not mean the `Parent` component was removed from the component storage, just that the
-/// `Entity` will no longer be considered to be a part of the `Hierarchy`. This is because the user
-/// may wish to either remove only the component, or the complete Entity, or something completely
-/// different. When an `Entity` that is a parent gets removed from the hierarchy, the full tree of
-/// children below it will also be removed from the hierarchy.
+/// ## `Parent`
+///
+/// This crate uses a generic parameter `P` for the parent component. Its bound by the `Parent`
+/// trait that only requires a getter for the `Entity` that's the parent.
+///
+/// ## Usage
+///
+/// ```
+/// use specs::prelude::{Component, DenseVecStorage, Entity, FlaggedStorage};
+/// use specs_hierarchy::{Hierarchy, Parent as HParent};
+///
+/// pub use specs_hierarchy::HierarchyEvent;
+/// pub type ParentHierarchy = Hierarchy<Parent>;
+///
+/// /// Component for defining a parent entity.
+/// ///
+/// /// The entity with this component *has* a parent, rather than *is* a parent.
+/// #[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
+/// pub struct Parent {
+///     /// The parent entity
+///     pub entity: Entity,
+/// }
+///
+/// impl Component for Parent {
+///     type Storage = FlaggedStorage<Self, DenseVecStorage<Self>>;
+/// }
+///
+/// impl HParent for Parent {
+///     fn parent_entity(&self) -> Entity {
+///         self.entity
+///     }
+/// }
+/// ```
+///
+
 extern crate hibitset;
 extern crate shred;
 #[macro_use]
@@ -16,16 +44,16 @@ extern crate shred_derive;
 extern crate shrev;
 extern crate specs;
 
-use std::marker::PhantomData;
 use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 
+use hibitset::BitSetLike;
+use shred::SetupHandler;
+use shrev::EventChannel;
 use specs::prelude::{BitSet, Component, Entities, Entity, InsertedFlag, Join, ModifiedFlag,
                      ReadStorage, ReaderId, RemovedFlag, Resources, System, SystemData, Tracked,
                      Write, WriteStorage};
 use specs::world::Index;
-use hibitset::BitSetLike;
-use shrev::EventChannel;
-use shred::SetupHandler;
 
 /// Hierarchy events.
 ///
@@ -46,11 +74,11 @@ pub enum HierarchyEvent {
 /// internal structure is kept in sync with the `Tracked` events for that component type.
 ///
 /// Will send modification events on the internal `EventChannel`. Note that `Removed` events
-/// does not mean the `Parent` component was removed from the component storage, just that the
-/// `Entity` will no longer be considered to be a part of the `Hierarchy`. This is because the user
-/// may wish to either remove only the component, or the complete Entity, or something completely
-/// different. When an `Entity` that is a parent gets removed from the hierarchy, the full tree of
-/// children below it will also be removed from the hierarchy.
+/// do not indicate that the `Parent` component was removed from the component storage, just that
+/// the `Entity` will no longer be considered to be a part of the `Hierarchy`. This is because the
+/// user may wish to either remove only the component, or the complete Entity, or something
+/// completely different. When an `Entity` that is a parent gets removed from the hierarchy, the
+/// full tree of children below it will also be removed from the hierarchy.
 ///
 /// Any cycles in the hierarchy will cause Undefined Behavior.
 pub struct Hierarchy<P> {
@@ -333,9 +361,13 @@ impl<P> Hierarchy<P> {
     }
 }
 
-/// Implemented by the component type that provides parenting links for a hierarchy.
+/// Bound for the parent component of your crate. Your `Parent` component usually just contains the
+/// `Entity` that's the parent you're linking to.
+///
+/// Note that the component should indicate that the `Entity` its added *has* a parent (the entity
+/// stored in your component).
 pub trait Parent {
-    /// Get the parent entity
+    /// Retrieves the parent `Entity`.
     fn parent_entity(&self) -> Entity;
 }
 
@@ -377,7 +409,7 @@ where
 
 /// System for maintaining a `Hierarchy` resource.
 ///
-/// ### Type parameters:
+/// ## Type parameters:
 ///
 /// - `P`: Component type that provides `Parent` links for the maintained `Hierarchy`
 pub struct HierarchySystem<P> {
