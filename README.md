@@ -8,7 +8,7 @@
 [ci]: https://img.shields.io/crates/v/specs-hierarchy.svg
 [cl]: https://crates.io/crates/specs-hierarchy/
 
-[li]: https://img.shields.io/badge/license-Apache%202.0-blue.svg
+[li]: https://img.shields.io/crates/l/specs-hierarchy.svg
 
 [di]: https://docs.rs/specs-hierarchy/badge.svg
 [dl]: https://docs.rs/specs-hierarchy/
