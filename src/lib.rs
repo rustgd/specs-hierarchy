@@ -51,7 +51,7 @@ use hibitset::BitSetLike;
 use shred::SetupHandler;
 use shrev::EventChannel;
 use specs::prelude::{BitSet, Component, Entities, Entity, InsertedFlag, Join, ModifiedFlag,
-                     ReadStorage, ReaderId, RemovedFlag, Resources, System, SystemData, Tracked,
+                     ReadStorage, ReaderId, RemovedFlag, Resources, System, StaticSystemData, Tracked,
                      Write, WriteStorage};
 use specs::world::Index;
 
@@ -384,7 +384,7 @@ where
     fn setup(res: &mut Resources) {
         if !res.has_value::<Hierarchy<P>>() {
             let hierarchy = {
-                let mut storage: WriteStorage<P> = SystemData::fetch(&res);
+                let mut storage: WriteStorage<P> = StaticSystemData::fetch(&res);
                 Hierarchy::<P>::new(
                     storage.track_modified(),
                     storage.track_inserted(),
@@ -397,7 +397,7 @@ where
 }
 
 /// Utility struct for the data needed by the `Hierarchy` maintain.
-#[derive(SystemData)]
+#[derive(StaticSystemData)]
 pub struct ParentData<'a, P>
 where
     P: Component + Parent,
