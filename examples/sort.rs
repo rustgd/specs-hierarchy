@@ -38,10 +38,10 @@ fn main() {
 
     {
         let mut parents = world.write_storage::<Parent>();
-        parents.insert(e1, Parent { entity: e5 });
-        parents.insert(e3, Parent { entity: e1 });
-        parents.insert(e4, Parent { entity: e5 });
-        parents.insert(e5, Parent { entity: e2 });
+        parents.insert(e1, Parent { entity: e5 }).unwrap();
+        parents.insert(e3, Parent { entity: e1 }).unwrap();
+        parents.insert(e4, Parent { entity: e5 }).unwrap();
+        parents.insert(e5, Parent { entity: e2 }).unwrap();
     }
 
     dispatcher.dispatch(&mut world.res);

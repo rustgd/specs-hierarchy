@@ -9,7 +9,10 @@
 ///
 /// ## Usage
 ///
-/// ```
+/// ```rust
+/// # extern crate specs;
+/// # extern crate specs_hierarchy;
+///
 /// use specs::prelude::{Component, DenseVecStorage, Entity, FlaggedStorage};
 /// use specs_hierarchy::{Hierarchy, Parent as HParent};
 ///
@@ -34,6 +37,8 @@
 ///         self.entity
 ///     }
 /// }
+///
+/// # fn main() {}
 /// ```
 ///
 
