@@ -149,8 +149,8 @@ impl<P> Hierarchy<P> {
     }
 
     /// Get the children of a specific entity.
-    pub fn children(&self, entity: Entity) -> Option<&[Entity]> {
-        self.children.get(&entity).map(|vec| vec.as_slice())
+    pub fn children(&self, entity: Entity) -> &[Entity] {
+        self.children.get(&entity).map(|vec| vec.as_slice()).unwrap_or(&[])
     }
 
     /// Get the parent of a specific entity
