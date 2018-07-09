@@ -446,8 +446,8 @@ where
 mod tests {
 
     use super::{Hierarchy, HierarchyEvent, HierarchySystem, Parent as PParent};
-    use specs::prelude::{Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId, RunNow,
-                         System, World};
+    use specs::prelude::{Builder, Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId,
+                         RunNow, System, World};
 
     struct Parent {
         entity: Entity,
