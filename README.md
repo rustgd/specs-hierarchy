@@ -37,7 +37,7 @@ children below it will also be removed from the hierarchy.
 ```toml
 # Cargo.toml
 [dependencies]
-specs-hierarchy = "0.1.0-alpha7"
+specs-hierarchy = "0.2.0"
 ```
 
 ## Example
