@@ -153,6 +153,36 @@ impl<P> Hierarchy<P> {
         self.children.get(&entity).map(|vec| vec.as_slice()).unwrap_or(&[])
     }
 
+    /// Get all the children of an entity recursively.
+    pub fn recursive_children(&self, entity: Entity) -> Vec<Entity> {
+        // Implementing this as an iterator is technically possible but comes with drawbacks.
+        // Here are the approaches I tried.
+        //
+        // - Static use of chain() and flat_map() to build an iterator that works up to 64 layers.
+        // In addition to placing a hard limit on how many layers we can have in the Hierarchy
+        // this also makes the function return a pretty fat iterator with potential for lots of
+        // empty internal iterators.
+        //
+        // - Use the heap to build a dynamic iterator with `Box<Iterator<Item=Entity>>`
+        // Results in more allocations than the current approach, and doesn't even work from a
+        // lifetime standpoint, because Box has to be 'static, and these internal iterators
+        // are tied to the self lifetime.
+        let immediate_children = self.children(entity);
+        let mut ret = Vec::with_capacity(immediate_children.len());
+        for child in immediate_children {
+            ret.push(*child);
+            self.recursive_children_internal(*child, &mut ret);
+        }
+        ret
+    }
+
+    fn recursive_children_internal(&self, entity: Entity, progress: &mut Vec<Entity>) {
+        for child in self.children(entity) {
+            progress.push(*child);
+            self.recursive_children_internal(*child, progress);
+        }
+    }
+
     /// Get the parent of a specific entity
     pub fn parent(&self, entity: Entity) -> Option<Entity> {
         self.current_parent.get(&entity).cloned()
@@ -521,5 +551,34 @@ mod tests {
         assert_eq!(world.is_alive(e5), false);
 
         assert_eq!(0, world.read_resource::<Hierarchy<Parent>>().all().len());
+    }
+
+    #[test]
+    fn test_recursive_children() {
+        let mut world = World::new();
+        world.register::<Parent>();
+        let mut system = HierarchySystem::<Parent>::new();
+        System::setup(&mut system, &mut world.res);
+        let e1 = world.create_entity().build();
+
+        let e2 = world.create_entity().with(Parent { entity: e1 }).build();
+
+        let e3 = world.create_entity().build();
+
+        let e4 = world.create_entity().with(Parent { entity: e3 }).build();
+
+        let e5 = world.create_entity().with(Parent { entity: e3 }).build();
+
+        let e6 = world.create_entity().with(Parent { entity: e4 }).build();
+
+        system.run_now(&mut world.res);
+        world.maintain();
+        let hierarchy = world.read_resource::<Hierarchy<Parent>>();
+        assert_eq!(hierarchy.recursive_children(e1), vec![e2]);
+        assert_eq!(hierarchy.recursive_children(e2), vec![]);
+        assert_eq!(hierarchy.recursive_children(e3), vec![e4, e6, e5]);
+        assert_eq!(hierarchy.recursive_children(e4), vec![e6]);
+        assert_eq!(hierarchy.recursive_children(e5), vec![]);
+        assert_eq!(hierarchy.recursive_children(e6), vec![]);
     }
 }
