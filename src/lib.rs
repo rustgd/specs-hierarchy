@@ -41,7 +41,6 @@
 /// # fn main() {}
 /// ```
 ///
-
 extern crate hibitset;
 extern crate shred;
 #[macro_use]
@@ -55,9 +54,10 @@ use std::marker::PhantomData;
 use hibitset::BitSetLike;
 use shred::SetupHandler;
 use shrev::EventChannel;
-use specs::prelude::{BitSet, Component, Entities, Entity, InsertedFlag, Join, ModifiedFlag,
-                     ReadStorage, ReaderId, RemovedFlag, Resources, System, SystemData, Tracked,
-                     Write, WriteStorage};
+use specs::prelude::{
+    BitSet, Component, Entities, Entity, InsertedFlag, Join, ModifiedFlag, ReadStorage, ReaderId,
+    RemovedFlag, Resources, System, SystemData, Tracked, Write, WriteStorage,
+};
 use specs::world::Index;
 
 /// Hierarchy events.
@@ -150,7 +150,10 @@ impl<P> Hierarchy<P> {
 
     /// Get the children of a specific entity.
     pub fn children(&self, entity: Entity) -> &[Entity] {
-        self.children.get(&entity).map(|vec| vec.as_slice()).unwrap_or(&[])
+        self.children
+            .get(&entity)
+            .map(|vec| vec.as_slice())
+            .unwrap_or(&[])
     }
 
     /// Get all the children of an entity recursively.
@@ -238,7 +241,8 @@ impl<P> Hierarchy<P> {
             while i < self.sorted.len() {
                 let entity = self.sorted[i];
                 let remove = self.scratch_set.contains(&entity)
-                    || self.current_parent
+                    || self
+                        .current_parent
                         .get(&entity)
                         .map(|parent_entity| self.scratch_set.contains(&parent_entity))
                         .unwrap_or(false);
@@ -248,7 +252,8 @@ impl<P> Hierarchy<P> {
                     }
                     self.scratch_set.insert(entity);
                     self.sorted.remove(i);
-                    if let Some(children) = self.current_parent
+                    if let Some(children) = self
+                        .current_parent
                         .get(&entity)
                         .cloned()
                         .and_then(|parent_entity| self.children.get_mut(&parent_entity))
@@ -280,7 +285,8 @@ impl<P> Hierarchy<P> {
 
             // if we insert a parent component on an entity that have children, we need to make
             // sure the parent is inserted before the children in the sorted list
-            let insert_index = self.children
+            let insert_index = self
+                .children
                 .get(&entity)
                 .and_then(|children| {
                     children
@@ -301,7 +307,8 @@ impl<P> Hierarchy<P> {
             }
 
             {
-                let children = self.children
+                let children = self
+                    .children
                     .entry(parent_entity)
                     .or_insert_with(Vec::default);
                 children.push(entity);
@@ -346,7 +353,8 @@ impl<P> Hierarchy<P> {
                     let move_entity = self.sorted.remove(process_index);
                     self.sorted.insert(entity_index, move_entity);
                     offset += 1;
-                    process_index = self.current_parent
+                    process_index = self
+                        .current_parent
                         .get(&move_entity)
                         .and_then(|p_entity| self.entities.get(&p_entity.id()))
                         .map(|p_index| p_index + offset)
@@ -373,7 +381,8 @@ impl<P> Hierarchy<P> {
             for i in 0..self.sorted.len() {
                 let entity = self.sorted[i];
                 let notify = self.scratch_set.contains(&entity)
-                    || self.current_parent
+                    || self
+                        .current_parent
                         .get(&entity)
                         .map(|parent_entity| self.scratch_set.contains(&parent_entity))
                         .unwrap_or(false);
@@ -476,8 +485,10 @@ where
 mod tests {
 
     use super::{Hierarchy, HierarchyEvent, HierarchySystem, Parent as PParent};
-    use specs::prelude::{Builder, Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId,
-                         RunNow, System, World};
+    use specs::prelude::{
+        Builder, Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId, RunNow, System,
+        World,
+    };
 
     struct Parent {
         entity: Entity,
