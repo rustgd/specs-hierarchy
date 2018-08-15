@@ -41,7 +41,6 @@
 /// # fn main() {}
 /// ```
 ///
-
 extern crate hibitset;
 extern crate shred;
 #[macro_use]
@@ -55,9 +54,10 @@ use std::marker::PhantomData;
 use hibitset::BitSetLike;
 use shred::SetupHandler;
 use shrev::EventChannel;
-use specs::prelude::{BitSet, Component, Entities, Entity, InsertedFlag, Join, ModifiedFlag,
-                     ReadStorage, ReaderId, RemovedFlag, Resources, System, SystemData, Tracked,
-                     Write, WriteStorage};
+use specs::prelude::{
+    BitSet, Component, Entities, Entity, InsertedFlag, Join, ModifiedFlag, ReadStorage, ReaderId,
+    RemovedFlag, Resources, System, SystemData, Tracked, Write, WriteStorage,
+};
 use specs::world::Index;
 
 /// Hierarchy events.
@@ -148,9 +148,38 @@ impl<P> Hierarchy<P> {
         self.sorted.as_slice()
     }
 
-    /// Get the children of a specific entity.
+    /// Get the immediate children of a specific entity.
     pub fn children(&self, entity: Entity) -> &[Entity] {
-        self.children.get(&entity).map(|vec| vec.as_slice()).unwrap_or(&[])
+        self.children
+            .get(&entity)
+            .map(|vec| vec.as_slice())
+            .unwrap_or(&[])
+    }
+
+    /// Get all children of this entity recursively as a `BitSet`
+    ///
+    /// This does not include the parent entity you pass in.
+    pub fn all_children(&self, entity: Entity) -> BitSet {
+        let mut entities = BitSet::new();
+        self.add_children_to_set(entity, &mut entities);
+        entities
+    }
+
+    fn add_children_to_set(&self, entity: Entity, set: &mut BitSet) {
+        if let Some(children) = self.children.get(&entity) {
+            for child in children {
+                set.add(child.id());
+                self.add_children_to_set(*child, set);
+            }
+        }
+    }
+
+    /// Returns an iterator over all of the recursive children of this entity.
+    ///
+    /// This does not include the parent entity you pass in. Parents are guaranteed to be
+    /// prior to their children.
+    pub fn all_children_iter<'a>(&'a self, entity: Entity) -> SubHierarchyIterator<'a, P> {
+        SubHierarchyIterator::new(self, entity)
     }
 
     /// Get the parent of a specific entity
@@ -208,7 +237,8 @@ impl<P> Hierarchy<P> {
             while i < self.sorted.len() {
                 let entity = self.sorted[i];
                 let remove = self.scratch_set.contains(&entity)
-                    || self.current_parent
+                    || self
+                        .current_parent
                         .get(&entity)
                         .map(|parent_entity| self.scratch_set.contains(&parent_entity))
                         .unwrap_or(false);
@@ -218,7 +248,8 @@ impl<P> Hierarchy<P> {
                     }
                     self.scratch_set.insert(entity);
                     self.sorted.remove(i);
-                    if let Some(children) = self.current_parent
+                    if let Some(children) = self
+                        .current_parent
                         .get(&entity)
                         .cloned()
                         .and_then(|parent_entity| self.children.get_mut(&parent_entity))
@@ -250,7 +281,8 @@ impl<P> Hierarchy<P> {
 
             // if we insert a parent component on an entity that have children, we need to make
             // sure the parent is inserted before the children in the sorted list
-            let insert_index = self.children
+            let insert_index = self
+                .children
                 .get(&entity)
                 .and_then(|children| {
                     children
@@ -271,7 +303,8 @@ impl<P> Hierarchy<P> {
             }
 
             {
-                let children = self.children
+                let children = self
+                    .children
                     .entry(parent_entity)
                     .or_insert_with(Vec::default);
                 children.push(entity);
@@ -316,7 +349,8 @@ impl<P> Hierarchy<P> {
                     let move_entity = self.sorted.remove(process_index);
                     self.sorted.insert(entity_index, move_entity);
                     offset += 1;
-                    process_index = self.current_parent
+                    process_index = self
+                        .current_parent
                         .get(&move_entity)
                         .and_then(|p_entity| self.entities.get(&p_entity.id()))
                         .map(|p_index| p_index + offset)
@@ -343,7 +377,8 @@ impl<P> Hierarchy<P> {
             for i in 0..self.sorted.len() {
                 let entity = self.sorted[i];
                 let notify = self.scratch_set.contains(&entity)
-                    || self.current_parent
+                    || self
+                        .current_parent
                         .get(&entity)
                         .map(|parent_entity| self.scratch_set.contains(&parent_entity))
                         .unwrap_or(false);
@@ -362,6 +397,92 @@ impl<P> Hierarchy<P> {
         }
         for entity in &self.scratch_set {
             self.external_parents.remove(entity);
+        }
+    }
+}
+
+pub struct SubHierarchyIterator<'a, P>
+where
+    P: 'a,
+{
+    current_index: usize,
+    end_index: usize,
+    hierarchy: &'a Hierarchy<P>,
+    entities: BitSet,
+}
+
+impl<'a, P> SubHierarchyIterator<'a, P>
+where
+    P: 'a,
+{
+    fn new(hierarchy: &'a Hierarchy<P>, root: Entity) -> Self {
+        let max = hierarchy.sorted.len();
+        let root_index = hierarchy
+            .children
+            .get(&root)
+            .map(|children| {
+                children
+                    .iter()
+                    .map(|c| hierarchy.entities.get(&c.id()).cloned().unwrap_or(max))
+                    .min()
+                    .unwrap_or(max)
+            })
+            .unwrap_or(max);
+        let mut iter = SubHierarchyIterator {
+            hierarchy,
+            current_index: root_index,
+            end_index: 0,
+            entities: BitSet::new(),
+        };
+        iter.process_entity(root);
+        if root_index != max {
+            iter.process_entity(hierarchy.sorted[root_index]);
+        }
+        iter
+    }
+
+    fn process_entity(&mut self, child: Entity) {
+        if let Some(children) = self.hierarchy.children.get(&child) {
+            for child in children {
+                self.entities.add(child.id());
+                if let Some(index) = self.hierarchy.entities.get(&child.id()) {
+                    if *index > self.end_index {
+                        self.end_index = *index;
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl<'a, P> Iterator for SubHierarchyIterator<'a, P>
+where
+    P: 'a,
+{
+    type Item = Entity;
+
+    fn next(&mut self) -> Option<<Self as Iterator>::Item> {
+        if self.current_index >= self.hierarchy.sorted.len() || self.current_index > self.end_index
+        {
+            None
+        } else {
+            let entity = self.hierarchy.sorted[self.current_index];
+            let mut found_next = false;
+            while !found_next {
+                self.current_index += 1;
+                if self.current_index > self.end_index || self.current_index >= self.hierarchy.sorted.len()
+                {
+                    found_next = true;
+                } else if self
+                    .entities
+                    .contains(self.hierarchy.sorted[self.current_index].id())
+                {
+                    found_next = true;
+                    let current_index = self.current_index; // compiler fails to realise a usize is Copy, so we break it out
+                    self.process_entity(self.hierarchy.sorted[current_index]);
+                }
+            }
+            Some(entity)
         }
     }
 }
@@ -446,8 +567,10 @@ where
 mod tests {
 
     use super::{Hierarchy, HierarchyEvent, HierarchySystem, Parent as PParent};
-    use specs::prelude::{Builder, Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId,
-                         RunNow, System, World};
+    use specs::prelude::{
+        Builder, Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId, RunNow, System,
+        World,
+    };
 
     struct Parent {
         entity: Entity,
@@ -521,5 +644,65 @@ mod tests {
         assert_eq!(world.is_alive(e5), false);
 
         assert_eq!(0, world.read_resource::<Hierarchy<Parent>>().all().len());
+    }
+
+    #[test]
+    fn test_all_children_iter() {
+        let mut world = World::new();
+        world.register::<Parent>();
+        let mut system = HierarchySystem::<Parent>::new();
+        System::setup(&mut system, &mut world.res);
+        let e0 = world.create_entity().build();
+
+        let e1 = world.create_entity().with(Parent { entity: e0 }).build();
+
+        let e2 = world.create_entity().build();
+
+        let e3 = world.create_entity().with(Parent { entity: e2 }).build();
+
+        let e4 = world.create_entity().with(Parent { entity: e2 }).build();
+
+        let e5 = world.create_entity().with(Parent { entity: e3 }).build();
+
+        system.run_now(&mut world.res);
+        world.maintain();
+        let hierarchy = world.read_resource::<Hierarchy<Parent>>();
+        assert!(hierarchy.all_children_iter(e0).eq([e1].iter().cloned()));
+        assert_eq!(hierarchy.all_children_iter(e1).next(), None);
+        assert!(hierarchy.all_children_iter(e2).eq([e3, e4, e5].iter().cloned()));
+        assert!(hierarchy.all_children_iter(e3).eq([e5].iter().cloned()));
+        assert_eq!(hierarchy.all_children_iter(e4).next(), None);
+        assert_eq!(hierarchy.all_children_iter(e5).next(), None);
+    }
+
+    #[test]
+    fn test_all_children() {
+        let mut world = World::new();
+        world.register::<Parent>();
+        let mut system = HierarchySystem::<Parent>::new();
+        System::setup(&mut system, &mut world.res);
+        let e0 = world.create_entity().build();
+
+        let e1 = world.create_entity().with(Parent { entity: e0 }).build();
+
+        let e2 = world.create_entity().build();
+
+        let e3 = world.create_entity().with(Parent { entity: e2 }).build();
+
+        let e4 = world.create_entity().with(Parent { entity: e2 }).build();
+
+        let e5 = world.create_entity().with(Parent { entity: e3 }).build();
+
+        system.run_now(&mut world.res);
+        world.maintain();
+        let hierarchy = world.read_resource::<Hierarchy<Parent>>();
+        use hibitset::BitSetLike;
+
+        assert!(hierarchy.all_children(e0).iter().eq([e1].iter().map(|e| e.id())));
+        assert_eq!(hierarchy.all_children(e1).iter().next(), None);
+        assert!(hierarchy.all_children(e2).iter().eq([e3, e4, e5].iter().map(|e| e.id())));
+        assert!(hierarchy.all_children(e3).iter().eq([e5].iter().map(|e| e.id())));
+        assert_eq!(hierarchy.all_children(e4).iter().next(), None);
+        assert_eq!(hierarchy.all_children(e5).iter().next(), None);
     }
 }

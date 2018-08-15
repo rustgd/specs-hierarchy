@@ -20,7 +20,7 @@
 
 Scene graph type hierarchy abstraction for use with [`specs`].
 
-Builds up a `Hierarchy` resource, by querying a user supplied `Parent` component. 
+Builds up a `Hierarchy` resource, by querying a user supplied `Parent` component.
 Requires the component to be `Tracked`.
 
 Will send modification events on an internal `EventChannel`. Note that `Removed` events
@@ -29,7 +29,7 @@ does not mean the `Parent` component was removed from the component storage, jus
 may wish to either remove only the component, the complete `Entity`, or something completely
 different. When an `Entity` that is a parent gets removed from the hierarchy, the full tree of
 children below it will also be removed from the hierarchy.
- 
+
 [`specs`]: https://github.com/slide-rs/specs
 
 ## Usage
@@ -37,7 +37,7 @@ children below it will also be removed from the hierarchy.
 ```toml
 # Cargo.toml
 [dependencies]
-specs-hierarchy = "0.2.0"
+specs-hierarchy = "0.2.1"
 ```
 
 ## Example
