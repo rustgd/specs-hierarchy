@@ -55,8 +55,8 @@ use hibitset::BitSetLike;
 use shred::SetupHandler;
 use shrev::EventChannel;
 use specs::prelude::{
-    BitSet, Component, Entities, Entity, InsertedFlag, Join, ModifiedFlag, ReadStorage, ReaderId,
-    RemovedFlag, Resources, System, SystemData, Tracked, Write, WriteStorage,
+    BitSet, Component, Entities, Entity, Join, ReadStorage, ReaderId, Resources, System,
+    SystemData, Tracked, Write, WriteStorage, ComponentEvent,
 };
 use specs::world::Index;
 
@@ -94,10 +94,7 @@ pub struct Hierarchy<P> {
     external_parents: HashSet<Entity>,
     changed: EventChannel<HierarchyEvent>,
 
-    modified_id: ReaderId<ModifiedFlag>,
-    inserted_id: ReaderId<InsertedFlag>,
-    removed_id: ReaderId<RemovedFlag>,
-
+    reader_id: ReaderId<ComponentEvent>,
     modified: BitSet,
     inserted: BitSet,
     removed: BitSet,
@@ -110,9 +107,7 @@ pub struct Hierarchy<P> {
 impl<P> Hierarchy<P> {
     /// Create a new hierarchy object.
     pub fn new(
-        modified_id: ReaderId<ModifiedFlag>,
-        inserted_id: ReaderId<InsertedFlag>,
-        removed_id: ReaderId<RemovedFlag>,
+        reader_id: ReaderId<ComponentEvent>,
     ) -> Self
     where
         P: Component,
@@ -126,10 +121,7 @@ impl<P> Hierarchy<P> {
             children: HashMap::new(),
             changed: EventChannel::new(),
 
-            modified_id,
-            inserted_id,
-            removed_id,
-
+            reader_id,
             modified: BitSet::new(),
             inserted: BitSet::new(),
             removed: BitSet::new(),
@@ -212,9 +204,22 @@ impl<P> Hierarchy<P> {
         self.inserted.clear();
         self.removed.clear();
 
-        parents.populate_modified(&mut self.modified_id, &mut self.modified);
-        parents.populate_inserted(&mut self.inserted_id, &mut self.inserted);
-        parents.populate_removed(&mut self.removed_id, &mut self.removed);
+        let events = parents
+            .channel()
+            .read(&mut self.reader_id);
+        for event in events {
+            match event {
+                ComponentEvent::Modified(id) => {
+                    self.modified.add(*id);
+                }
+                ComponentEvent::Inserted(id) => {
+                    self.inserted.add(*id);
+                }
+                ComponentEvent::Removed(id) => {
+                    self.removed.add(*id);
+                }
+            }
+        }
 
         // process removed parent components
         self.scratch_set.clear();
@@ -511,11 +516,7 @@ where
         if !res.has_value::<Hierarchy<P>>() {
             let hierarchy = {
                 let mut storage: WriteStorage<P> = SystemData::fetch(&res);
-                Hierarchy::<P>::new(
-                    storage.track_modified(),
-                    storage.track_inserted(),
-                    storage.track_removed(),
-                )
+                Hierarchy::<P>::new(storage.register_reader())
             };
             res.insert(hierarchy);
         }
