@@ -64,6 +64,7 @@ use specs::world::Index;
 ///
 /// These are the events that are sent through the internal `EventChannel` in the `Hierarchy`
 /// resource.
+#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub enum HierarchyEvent {
     /// `Entity` was either inserted or modified in the `Hierarchy`
     Modified(Entity),
