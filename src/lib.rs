@@ -55,8 +55,8 @@ use hibitset::BitSetLike;
 use shred::SetupHandler;
 use shrev::EventChannel;
 use specs::prelude::{
-    BitSet, Component, Entities, Entity, Join, ReadStorage, ReaderId, Resources, System,
-    SystemData, Tracked, Write, WriteStorage, ComponentEvent,
+    BitSet, Component, Entities, Entity, Join, ReadStorage, ReaderId, System,
+    SystemData, Tracked, Write, WriteStorage, ComponentEvent, World, ResourceId,
 };
 use specs::world::Index;
 
@@ -513,7 +513,7 @@ where
     P: Component + Send + Sync + 'static,
     P::Storage: Tracked,
 {
-    fn setup(res: &mut Resources) {
+    fn setup(res: &mut World) {
         if !res.has_value::<Hierarchy<P>>() {
             let hierarchy = {
                 let mut storage: WriteStorage<P> = SystemData::fetch(&res);
