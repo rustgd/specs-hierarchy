@@ -570,6 +570,7 @@ mod tests {
         Builder, Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId, RunNow, System,
         World,
     };
+    use specs::WorldExt;
 
     struct Parent {
         entity: Entity,
@@ -588,7 +589,7 @@ mod tests {
     fn delete_removals(world: &mut World, reader_id: &mut ReaderId<HierarchyEvent>) {
         let mut remove = vec![];
         for event in world
-            .read_resource::<Hierarchy<Parent>>()
+            .fetch::<Hierarchy<Parent>>()
             .changed()
             .read(reader_id)
         {
@@ -608,7 +609,7 @@ mod tests {
         let mut world = World::new();
         world.register::<Parent>();
         let mut system = HierarchySystem::<Parent>::new();
-        System::setup(&mut system, &mut world.res);
+        System::setup(&mut system, &mut world);
         let mut reader_id = world.write_resource::<Hierarchy<Parent>>().track();
 
         let e1 = world.create_entity().build();
@@ -621,12 +622,12 @@ mod tests {
 
         let e5 = world.create_entity().with(Parent { entity: e4 }).build();
 
-        system.run_now(&mut world.res);
+        system.run_now(&mut world);
         delete_removals(&mut world, &mut reader_id);
         world.maintain();
 
         let _ = world.delete_entity(e1);
-        system.run_now(&mut world.res);
+        system.run_now(&mut world);
         delete_removals(&mut world, &mut reader_id);
         world.maintain();
 
@@ -634,7 +635,7 @@ mod tests {
         assert_eq!(world.is_alive(e2), false);
 
         let _ = world.delete_entity(e3);
-        system.run_now(&mut world.res);
+        system.run_now(&mut world);
         delete_removals(&mut world, &mut reader_id);
         world.maintain();
 
@@ -650,7 +651,7 @@ mod tests {
         let mut world = World::new();
         world.register::<Parent>();
         let mut system = HierarchySystem::<Parent>::new();
-        System::setup(&mut system, &mut world.res);
+        System::setup(&mut system, &mut world);
         let e0 = world.create_entity().build();
 
         let e1 = world.create_entity().with(Parent { entity: e0 }).build();
@@ -663,7 +664,7 @@ mod tests {
 
         let e5 = world.create_entity().with(Parent { entity: e3 }).build();
 
-        system.run_now(&mut world.res);
+        system.run_now(&mut world);
         world.maintain();
         let hierarchy = world.read_resource::<Hierarchy<Parent>>();
         assert!(hierarchy.all_children_iter(e0).eq([e1].iter().cloned()));
@@ -681,7 +682,7 @@ mod tests {
         let mut world = World::new();
         world.register::<Parent>();
         let mut system = HierarchySystem::<Parent>::new();
-        System::setup(&mut system, &mut world.res);
+        System::setup(&mut system, &mut world);
         let e0 = world.create_entity().build();
 
         let e1 = world.create_entity().with(Parent { entity: e0 }).build();
@@ -694,7 +695,7 @@ mod tests {
 
         let e5 = world.create_entity().with(Parent { entity: e3 }).build();
 
-        system.run_now(&mut world.res);
+        system.run_now(&mut world);
         world.maintain();
         let hierarchy = world.read_resource::<Hierarchy<Parent>>();
         use hibitset::BitSetLike;
