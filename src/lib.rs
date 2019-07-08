@@ -588,11 +588,7 @@ mod tests {
 
     fn delete_removals(world: &mut World, reader_id: &mut ReaderId<HierarchyEvent>) {
         let mut remove = vec![];
-        for event in world
-            .fetch::<Hierarchy<Parent>>()
-            .changed()
-            .read(reader_id)
-        {
+        for event in world.fetch::<Hierarchy<Parent>>().changed().read(reader_id) {
             if let HierarchyEvent::Removed(entity) = *event {
                 remove.push(entity);
             }
