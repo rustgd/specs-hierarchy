@@ -55,8 +55,8 @@ use hibitset::BitSetLike;
 use shred::SetupHandler;
 use shrev::EventChannel;
 use specs::prelude::{
-    BitSet, Component, Entities, Entity, Join, ReadStorage, ReaderId, System,
-    SystemData, Tracked, Write, WriteStorage, ComponentEvent, World, ResourceId,
+    BitSet, Component, ComponentEvent, Entities, Entity, Join, ReadStorage, ReaderId, ResourceId,
+    System, SystemData, Tracked, World, Write, WriteStorage,
 };
 use specs::world::Index;
 
@@ -107,9 +107,7 @@ pub struct Hierarchy<P> {
 
 impl<P> Hierarchy<P> {
     /// Create a new hierarchy object.
-    pub fn new(
-        reader_id: ReaderId<ComponentEvent>,
-    ) -> Self
+    pub fn new(reader_id: ReaderId<ComponentEvent>) -> Self
     where
         P: Component,
         P::Storage: Tracked,
@@ -205,9 +203,7 @@ impl<P> Hierarchy<P> {
         self.inserted.clear();
         self.removed.clear();
 
-        let events = parents
-            .channel()
-            .read(&mut self.reader_id);
+        let events = parents.channel().read(&mut self.reader_id);
         for event in events {
             match event {
                 ComponentEvent::Modified(id) => {
@@ -476,7 +472,8 @@ where
             let mut found_next = false;
             while !found_next {
                 self.current_index += 1;
-                if self.current_index > self.end_index || self.current_index >= self.hierarchy.sorted.len()
+                if self.current_index > self.end_index
+                    || self.current_index >= self.hierarchy.sorted.len()
                 {
                     found_next = true;
                 } else if self
@@ -671,7 +668,9 @@ mod tests {
         let hierarchy = world.read_resource::<Hierarchy<Parent>>();
         assert!(hierarchy.all_children_iter(e0).eq([e1].iter().cloned()));
         assert_eq!(hierarchy.all_children_iter(e1).next(), None);
-        assert!(hierarchy.all_children_iter(e2).eq([e3, e4, e5].iter().cloned()));
+        assert!(hierarchy
+            .all_children_iter(e2)
+            .eq([e3, e4, e5].iter().cloned()));
         assert!(hierarchy.all_children_iter(e3).eq([e5].iter().cloned()));
         assert_eq!(hierarchy.all_children_iter(e4).next(), None);
         assert_eq!(hierarchy.all_children_iter(e5).next(), None);
@@ -700,10 +699,19 @@ mod tests {
         let hierarchy = world.read_resource::<Hierarchy<Parent>>();
         use hibitset::BitSetLike;
 
-        assert!(hierarchy.all_children(e0).iter().eq([e1].iter().map(|e| e.id())));
+        assert!(hierarchy
+            .all_children(e0)
+            .iter()
+            .eq([e1].iter().map(|e| e.id())));
         assert_eq!(hierarchy.all_children(e1).iter().next(), None);
-        assert!(hierarchy.all_children(e2).iter().eq([e3, e4, e5].iter().map(|e| e.id())));
-        assert!(hierarchy.all_children(e3).iter().eq([e5].iter().map(|e| e.id())));
+        assert!(hierarchy
+            .all_children(e2)
+            .iter()
+            .eq([e3, e4, e5].iter().map(|e| e.id())));
+        assert!(hierarchy
+            .all_children(e3)
+            .iter()
+            .eq([e5].iter().map(|e| e.id())));
         assert_eq!(hierarchy.all_children(e4).iter().next(), None);
         assert_eq!(hierarchy.all_children(e5).iter().next(), None);
     }
