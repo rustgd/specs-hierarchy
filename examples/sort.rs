@@ -23,7 +23,7 @@ fn main() {
     let mut dispatcher = DispatcherBuilder::new()
         .with(HierarchySystem::<Parent>::new(), "hierarchy_system", &[])
         .build();
-    dispatcher.setup(&mut world.res);
+    dispatcher.setup(&mut world);
 
     let _e0 = world.create_entity().build();
     let e1 = world.create_entity().build();
@@ -44,7 +44,7 @@ fn main() {
         parents.insert(e5, Parent { entity: e2 }).unwrap();
     }
 
-    dispatcher.dispatch(&mut world.res);
+    dispatcher.dispatch(&mut world);
 
     {
         let parents = world.read_storage::<Parent>();

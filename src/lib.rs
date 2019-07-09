@@ -55,8 +55,8 @@ use hibitset::BitSetLike;
 use shred::SetupHandler;
 use shrev::EventChannel;
 use specs::prelude::{
-    BitSet, Component, Entities, Entity, Join, ReadStorage, ReaderId, Resources, System,
-    SystemData, Tracked, Write, WriteStorage, ComponentEvent,
+    BitSet, Component, ComponentEvent, Entities, Entity, Join, ReadStorage, ReaderId, ResourceId,
+    System, SystemData, Tracked, World, Write, WriteStorage,
 };
 use specs::world::Index;
 
@@ -107,9 +107,7 @@ pub struct Hierarchy<P> {
 
 impl<P> Hierarchy<P> {
     /// Create a new hierarchy object.
-    pub fn new(
-        reader_id: ReaderId<ComponentEvent>,
-    ) -> Self
+    pub fn new(reader_id: ReaderId<ComponentEvent>) -> Self
     where
         P: Component,
         P::Storage: Tracked,
@@ -205,9 +203,7 @@ impl<P> Hierarchy<P> {
         self.inserted.clear();
         self.removed.clear();
 
-        let events = parents
-            .channel()
-            .read(&mut self.reader_id);
+        let events = parents.channel().read(&mut self.reader_id);
         for event in events {
             match event {
                 ComponentEvent::Modified(id) => {
@@ -476,7 +472,8 @@ where
             let mut found_next = false;
             while !found_next {
                 self.current_index += 1;
-                if self.current_index > self.end_index || self.current_index >= self.hierarchy.sorted.len()
+                if self.current_index > self.end_index
+                    || self.current_index >= self.hierarchy.sorted.len()
                 {
                     found_next = true;
                 } else if self
@@ -513,7 +510,7 @@ where
     P: Component + Send + Sync + 'static,
     P::Storage: Tracked,
 {
-    fn setup(res: &mut Resources) {
+    fn setup(res: &mut World) {
         if !res.has_value::<Hierarchy<P>>() {
             let hierarchy = {
                 let mut storage: WriteStorage<P> = SystemData::fetch(&res);
@@ -573,6 +570,7 @@ mod tests {
         Builder, Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId, RunNow, System,
         World,
     };
+    use specs::WorldExt;
 
     struct Parent {
         entity: Entity,
@@ -590,11 +588,7 @@ mod tests {
 
     fn delete_removals(world: &mut World, reader_id: &mut ReaderId<HierarchyEvent>) {
         let mut remove = vec![];
-        for event in world
-            .read_resource::<Hierarchy<Parent>>()
-            .changed()
-            .read(reader_id)
-        {
+        for event in world.fetch::<Hierarchy<Parent>>().changed().read(reader_id) {
             if let HierarchyEvent::Removed(entity) = *event {
                 remove.push(entity);
             }
@@ -611,7 +605,7 @@ mod tests {
         let mut world = World::new();
         world.register::<Parent>();
         let mut system = HierarchySystem::<Parent>::new();
-        System::setup(&mut system, &mut world.res);
+        System::setup(&mut system, &mut world);
         let mut reader_id = world.write_resource::<Hierarchy<Parent>>().track();
 
         let e1 = world.create_entity().build();
@@ -624,12 +618,12 @@ mod tests {
 
         let e5 = world.create_entity().with(Parent { entity: e4 }).build();
 
-        system.run_now(&mut world.res);
+        system.run_now(&mut world);
         delete_removals(&mut world, &mut reader_id);
         world.maintain();
 
         let _ = world.delete_entity(e1);
-        system.run_now(&mut world.res);
+        system.run_now(&mut world);
         delete_removals(&mut world, &mut reader_id);
         world.maintain();
 
@@ -637,7 +631,7 @@ mod tests {
         assert_eq!(world.is_alive(e2), false);
 
         let _ = world.delete_entity(e3);
-        system.run_now(&mut world.res);
+        system.run_now(&mut world);
         delete_removals(&mut world, &mut reader_id);
         world.maintain();
 
@@ -653,7 +647,7 @@ mod tests {
         let mut world = World::new();
         world.register::<Parent>();
         let mut system = HierarchySystem::<Parent>::new();
-        System::setup(&mut system, &mut world.res);
+        System::setup(&mut system, &mut world);
         let e0 = world.create_entity().build();
 
         let e1 = world.create_entity().with(Parent { entity: e0 }).build();
@@ -666,12 +660,14 @@ mod tests {
 
         let e5 = world.create_entity().with(Parent { entity: e3 }).build();
 
-        system.run_now(&mut world.res);
+        system.run_now(&mut world);
         world.maintain();
         let hierarchy = world.read_resource::<Hierarchy<Parent>>();
         assert!(hierarchy.all_children_iter(e0).eq([e1].iter().cloned()));
         assert_eq!(hierarchy.all_children_iter(e1).next(), None);
-        assert!(hierarchy.all_children_iter(e2).eq([e3, e4, e5].iter().cloned()));
+        assert!(hierarchy
+            .all_children_iter(e2)
+            .eq([e3, e4, e5].iter().cloned()));
         assert!(hierarchy.all_children_iter(e3).eq([e5].iter().cloned()));
         assert_eq!(hierarchy.all_children_iter(e4).next(), None);
         assert_eq!(hierarchy.all_children_iter(e5).next(), None);
@@ -682,7 +678,7 @@ mod tests {
         let mut world = World::new();
         world.register::<Parent>();
         let mut system = HierarchySystem::<Parent>::new();
-        System::setup(&mut system, &mut world.res);
+        System::setup(&mut system, &mut world);
         let e0 = world.create_entity().build();
 
         let e1 = world.create_entity().with(Parent { entity: e0 }).build();
@@ -695,15 +691,24 @@ mod tests {
 
         let e5 = world.create_entity().with(Parent { entity: e3 }).build();
 
-        system.run_now(&mut world.res);
+        system.run_now(&mut world);
         world.maintain();
         let hierarchy = world.read_resource::<Hierarchy<Parent>>();
         use hibitset::BitSetLike;
 
-        assert!(hierarchy.all_children(e0).iter().eq([e1].iter().map(|e| e.id())));
+        assert!(hierarchy
+            .all_children(e0)
+            .iter()
+            .eq([e1].iter().map(|e| e.id())));
         assert_eq!(hierarchy.all_children(e1).iter().next(), None);
-        assert!(hierarchy.all_children(e2).iter().eq([e3, e4, e5].iter().map(|e| e.id())));
-        assert!(hierarchy.all_children(e3).iter().eq([e5].iter().map(|e| e.id())));
+        assert!(hierarchy
+            .all_children(e2)
+            .iter()
+            .eq([e3, e4, e5].iter().map(|e| e.id())));
+        assert!(hierarchy
+            .all_children(e3)
+            .iter()
+            .eq([e5].iter().map(|e| e.id())));
         assert_eq!(hierarchy.all_children(e4).iter().next(), None);
         assert_eq!(hierarchy.all_children(e5).iter().next(), None);
     }

@@ -1,6 +1,6 @@
 [package]
 name = "specs-hierarchy"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["Aceeri <conmcclusk@gmail.com>", "Rhuagh <seamonr@gmail.com>"]
 repository = "https://github.com/rustgd/specs-hierarchy.git"
 homepage = "https://github.com/rustgd/specs-hierarchy.git"
@@ -13,11 +13,11 @@ description = "Scene graph type hierarchy abstraction for use with specs"
 keywords = ["specs", "scenegraph", "hierarchy"]
 
 [dependencies]
-hibitset = { version = "0.5", default-features = false }
-specs = { version = "0.14", default-features = false }
-shred = { version = "0.7", default-features = false }
-shrev = "1.0"
-shred-derive = "0.5"
+hibitset = { version = "0.6", default-features = false }
+specs = { version = "0.15", default-features = false }
+shred = { version = "0.9", default-features = false }
+shrev = "1.1"
+shred-derive = "0.6"
 
 [features]
 default = ["parallel"]
