@@ -541,10 +541,7 @@ where
     P: Component + Parent + Send + Sync + 'static,
     P::Storage: Tracked,
 {
-    type SystemData = (
-        ParentData<'a, P>,
-        WriteExpect<'a, Hierarchy<P>>,
-    );
+    type SystemData = (ParentData<'a, P>, WriteExpect<'a, Hierarchy<P>>);
 
     fn run(&mut self, (data, mut hierarchy): Self::SystemData) {
         hierarchy.maintain(data);

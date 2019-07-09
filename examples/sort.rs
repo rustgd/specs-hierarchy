@@ -21,7 +21,11 @@ impl specs_hierarchy::Parent for Parent {
 fn main() {
     let mut world = World::new();
     let mut dispatcher = DispatcherBuilder::new()
-        .with(HierarchySystem::<Parent>::new(&mut world), "hierarchy_system", &[])
+        .with(
+            HierarchySystem::<Parent>::new(&mut world),
+            "hierarchy_system",
+            &[],
+        )
         .build();
     dispatcher.setup(&mut world);
 
