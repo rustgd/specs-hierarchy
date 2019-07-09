@@ -52,11 +52,10 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 
 use hibitset::BitSetLike;
-use shred::SetupHandler;
 use shrev::EventChannel;
 use specs::prelude::{
     BitSet, Component, ComponentEvent, Entities, Entity, Join, ReadStorage, ReaderId, ResourceId,
-    System, SystemData, Tracked, World, Write, WriteStorage,
+    System, SystemData, Tracked, World, WriteExpect, WriteStorage,
 };
 use specs::world::Index;
 
@@ -500,27 +499,6 @@ pub trait Parent {
     fn parent_entity(&self) -> Entity;
 }
 
-/// Specs `SetupHandler` for the `Hierarchy` resource.
-pub struct HierarchySetupHandler<P> {
-    _m: PhantomData<P>,
-}
-
-impl<P> SetupHandler<Hierarchy<P>> for HierarchySetupHandler<P>
-where
-    P: Component + Send + Sync + 'static,
-    P::Storage: Tracked,
-{
-    fn setup(res: &mut World) {
-        if !res.has_value::<Hierarchy<P>>() {
-            let hierarchy = {
-                let mut storage: WriteStorage<P> = SystemData::fetch(&res);
-                Hierarchy::<P>::new(storage.register_reader())
-            };
-            res.insert(hierarchy);
-        }
-    }
-}
-
 /// Utility struct for the data needed by the `Hierarchy` maintain.
 #[derive(SystemData)]
 pub struct ParentData<'a, P>
@@ -541,8 +519,19 @@ pub struct HierarchySystem<P> {
     m: PhantomData<P>,
 }
 
-impl<P> HierarchySystem<P> {
-    pub fn new() -> Self {
+impl<P> HierarchySystem<P>
+where
+    P: Component + Parent + Send + Sync + 'static,
+    P::Storage: Tracked,
+{
+    pub fn new(world: &mut World) -> Self {
+        if !world.has_value::<Hierarchy<P>>() {
+            let hierarchy = {
+                let mut storage: WriteStorage<P> = SystemData::fetch(&world);
+                Hierarchy::<P>::new(storage.register_reader())
+            };
+            world.insert(hierarchy);
+        }
         HierarchySystem { m: PhantomData }
     }
 }
@@ -554,7 +543,7 @@ where
 {
     type SystemData = (
         ParentData<'a, P>,
-        Write<'a, Hierarchy<P>, HierarchySetupHandler<P>>,
+        WriteExpect<'a, Hierarchy<P>>,
     );
 
     fn run(&mut self, (data, mut hierarchy): Self::SystemData) {
@@ -604,8 +593,7 @@ mod tests {
     fn parent_removed() {
         let mut world = World::new();
         world.register::<Parent>();
-        let mut system = HierarchySystem::<Parent>::new();
-        System::setup(&mut system, &mut world);
+        let mut system = HierarchySystem::<Parent>::new(&mut world);
         let mut reader_id = world.write_resource::<Hierarchy<Parent>>().track();
 
         let e1 = world.create_entity().build();
@@ -646,8 +634,7 @@ mod tests {
     fn test_all_children_iter() {
         let mut world = World::new();
         world.register::<Parent>();
-        let mut system = HierarchySystem::<Parent>::new();
-        System::setup(&mut system, &mut world);
+        let mut system = HierarchySystem::<Parent>::new(&mut world);
         let e0 = world.create_entity().build();
 
         let e1 = world.create_entity().with(Parent { entity: e0 }).build();
@@ -677,8 +664,7 @@ mod tests {
     fn test_all_children() {
         let mut world = World::new();
         world.register::<Parent>();
-        let mut system = HierarchySystem::<Parent>::new();
-        System::setup(&mut system, &mut world);
+        let mut system = HierarchySystem::<Parent>::new(&mut world);
         let e0 = world.create_entity().build();
 
         let e1 = world.create_entity().with(Parent { entity: e0 }).build();
