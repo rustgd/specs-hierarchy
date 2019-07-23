@@ -524,7 +524,8 @@ where
     P: Component + Parent + Send + Sync + 'static,
     P::Storage: Tracked,
 {
-    pub fn new(world: &mut World) -> Self {
+    pub fn new(mut world: &mut World) -> Self {
+        <Self as System<'_>>::SystemData::setup(&mut world);
         if !world.has_value::<Hierarchy<P>>() {
             let hierarchy = {
                 let mut storage: WriteStorage<P> = SystemData::fetch(&world);
