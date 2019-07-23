@@ -553,8 +553,7 @@ mod tests {
 
     use super::{Hierarchy, HierarchyEvent, HierarchySystem, Parent as PParent};
     use specs::prelude::{
-        Builder, Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId, RunNow, System,
-        World,
+        Builder, Component, DenseVecStorage, Entity, FlaggedStorage, ReaderId, RunNow, World,
     };
     use specs::WorldExt;
 
