@@ -14,8 +14,8 @@ keywords = ["specs", "scenegraph", "hierarchy"]
 
 [dependencies]
 hibitset = { version = "0.6", default-features = false }
-specs = { version = "0.15", default-features = false }
-shred = { version = "0.9", default-features = false }
+specs = { version = "0.15.1", default-features = false }
+shred = { version = "0.9.3", default-features = false }
 shrev = "1.1"
 shred-derive = "0.6"
 
