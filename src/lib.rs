@@ -42,9 +42,6 @@
 /// ```
 ///
 extern crate hibitset;
-extern crate shred;
-#[macro_use]
-extern crate shred_derive;
 extern crate shrev;
 extern crate specs;
 
