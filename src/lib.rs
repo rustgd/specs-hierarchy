@@ -42,9 +42,6 @@
 /// ```
 ///
 extern crate hibitset;
-extern crate shred;
-#[macro_use]
-extern crate shred_derive;
 extern crate shrev;
 extern crate specs;
 
@@ -168,7 +165,7 @@ impl<P> Hierarchy<P> {
     ///
     /// This does not include the parent entity you pass in. Parents are guaranteed to be
     /// prior to their children.
-    pub fn all_children_iter<'a>(&'a self, entity: Entity) -> SubHierarchyIterator<'a, P> {
+    pub fn all_children_iter(&self, entity: Entity) -> SubHierarchyIterator<'_, P> {
         SubHierarchyIterator::new(self, entity)
     }
 
@@ -292,7 +289,7 @@ impl<P> Hierarchy<P> {
                         .min()
                         .cloned()
                 })
-                .unwrap_or(self.sorted.len());
+                .unwrap_or_else(|| self.sorted.len());
             self.entities.insert(entity.id(), insert_index);
             if insert_index >= self.sorted.len() {
                 self.sorted.push(entity);

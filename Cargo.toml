@@ -13,13 +13,10 @@ description = "Scene graph type hierarchy abstraction for use with specs"
 keywords = ["specs", "scenegraph", "hierarchy"]
 
 [dependencies]
-hibitset = { version = "0.6", default-features = false }
-specs = { version = "0.15", default-features = false }
-shred = { version = "0.9", default-features = false }
-shrev = "1.1"
-shred-derive = "0.6"
+hibitset = { version = "0.6.2", default-features = false }
+specs = { version = "0.16.0", default-features = false, features = ["shred-derive"] }
+shrev = "1.1.1"
 
 [features]
 default = ["parallel"]
-parallel = ["specs/parallel", "shred/parallel", "hibitset/parallel"]
-nightly = ["specs/nightly", "shred/nightly"]
+parallel = ["specs/parallel", "hibitset/parallel"]
