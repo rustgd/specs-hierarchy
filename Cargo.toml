@@ -13,8 +13,8 @@ description = "Scene graph type hierarchy abstraction for use with specs"
 keywords = ["specs", "scenegraph", "hierarchy"]
 
 [dependencies]
-hibitset = { version = "0.6.2", default-features = false }
-specs = { version = "0.16.0", default-features = false, features = ["shred-derive"] }
+hibitset = { version = "0.6.3", default-features = false }
+specs = { version = "0.16.1", default-features = false, features = ["shred-derive"] }
 shrev = "1.1.1"
 
 [features]
